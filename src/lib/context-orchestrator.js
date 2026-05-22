@@ -64,7 +64,7 @@ export function loadContextForNode(project, nodeKey) {
  * @returns {number} 大小（字节）
  */
 export function getContextSize(context) {
-  return Buffer.byteLength(JSON.stringify(context), 'utf8')
+  return new TextEncoder().encode(JSON.stringify(context)).length
 }
 
 /**
