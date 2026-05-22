@@ -1,25 +1,42 @@
 // src/components/content/ContentView.jsx
+import { useState } from 'react'
 import { useNovel } from '../../store'
-import { CHAPTERS, PLOT_LINES, CHARACTERS, FORESHADOWS } from '../../data'
 import { Badge, Btn, ProgressItem, ConflictBadge, ForeshadowTag, clsx } from '../ui'
 import { Check, Sparkles } from 'lucide-react'
 
 // ─── Chapter List ───
 function ChapterList() {
-  const { chapterIdx, selectChapter } = useNovel()
+  const { chapters, chapterIdx, selectChapter, volumes } = useNovel()
+  const [volFilter, setVolFilter] = useState('all')
+
+  const filtered = volFilter === 'all'
+    ? chapters
+    : chapters.filter(ch => {
+        const vol = volumes?.find(v => v.id === volFilter)
+        return vol?.chapters?.includes(ch.id)
+      })
 
   return (
     <div className="content-chapters">
       <div className="chapters-header">
         <span>章节列表</span>
         <div className="vol-tabs">
-          {['卷一', '卷二', '卷三'].map((v, i) => (
-            <span key={v} className={`vol-tab ${i === 0 ? 'active' : ''}`}>{v}</span>
+          <span
+            className={`vol-tab ${volFilter === 'all' ? 'active' : ''}`}
+            onClick={() => setVolFilter('all')}
+          >全部</span>
+          {(volumes || []).map(v => (
+            <span
+              key={v.id}
+              className={`vol-tab ${volFilter === v.id ? 'active' : ''}`}
+              onClick={() => setVolFilter(v.id)}
+            >{v.name?.replace(/^第.+册：/, '') || v.id}</span>
           ))}
         </div>
       </div>
       <div className="chapters-list">
-        {CHAPTERS.map((ch, i) => {
+        {filtered.map(ch => {
+          const i = chapters.findIndex(c => c.id === ch.id)
           const statusColor = { done: 'bg-verdant', progress: 'bg-ochre', locked: 'bg-faded/40' }
           const pct = ch.words > 0 ? Math.round(ch.words / ch.targetWords * 100) + '%' : '—'
           return (
@@ -42,7 +59,21 @@ function ChapterList() {
 
 // ─── Scene Tabs ───
 function SceneTabs() {
-  const { scenes, scene, sceneIdx, setSceneIdx, generating, generateScene, chapter } = useNovel()
+  const { chapter, scenes, scene, sceneIdx, setSceneIdx, generating, generateScene, validation, addScene, deleteScene } = useNovel()
+
+  function showValidation() {
+    document.querySelector('.meta-section-title')?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' })
+  }
+
+  const handleAddScene = () => {
+    if (!chapter) return
+    addScene(chapter.id)
+  }
+
+  const handleDeleteScene = () => {
+    if (!chapter || scenes.length === 0) return
+    deleteScene(chapter.id, sceneIdx)
+  }
 
   return (
     <div className="scene-toolbar">
@@ -56,13 +87,17 @@ function SceneTabs() {
             </span>
           ))
         }
+        <button type="button" className="scene-add-btn" onClick={handleAddScene} title="添加场景">+</button>
+        {scenes.length > 0 && (
+          <button type="button" className="scene-del-btn" onClick={handleDeleteScene} title="删除当前场景">−</button>
+        )}
       </div>
       <div className="toolbar-right">
         <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}>
           {scene ? scene.content.replace(/\s/g, '').length : 0} 字
         </span>
-        <button className="btn btn-ghost btn-sm" onClick={() => alert('校验结果：\n\n✓ POV角色存在且存活\n✓ 地点在知识图谱中\n✓ 冲突类型已声明\n✓ 五线进度单调递增\n✓ 伏笔状态转换合法\n\n全部通过 · 0错误 · 0警告')}>
-          ✓ 校验
+        <button type="button" className="btn btn-ghost btn-sm" onClick={showValidation}>
+          {validation.passed ? '✓ 校验' : `✗ 校验 (${validation.errorCount})`}
         </button>
         <button className="btn btn-primary btn-sm" onClick={generateScene} disabled={generating}>
           {generating ? '生成中...' : '✦ AI 生成场景'}
@@ -74,7 +109,7 @@ function SceneTabs() {
 
 // ─── Scene Content ───
 function SceneContent() {
-  const { scene, scenes } = useNovel()
+  const { scene, updateSceneContent } = useNovel()
 
   if (!scene) {
     return (
@@ -87,22 +122,22 @@ function SceneContent() {
     )
   }
 
-  const paragraphs = scene.content.split('\n\n')
-
   return (
     <div className="editor-writing">
-      <div className="scene-content">
-        {paragraphs.map((p, i) => (
-          <p key={i}>{p}</p>
-        ))}
-      </div>
+      <textarea
+        className="scene-editor"
+        value={scene.content}
+        onChange={e => updateSceneContent(e.target.value)}
+        placeholder="在此撰写场景正文…（段落之间空一行）"
+        spellCheck={false}
+      />
     </div>
   )
 }
 
 // ─── Meta Panel ───
 function MetaPanel() {
-  const { scene, chapter, scenes } = useNovel()
+  const { scene, chapter, plotLines, characters, foreshadows, validation } = useNovel()
 
   if (!scene) return (
     <div className="editor-meta" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -114,7 +149,7 @@ function MetaPanel() {
     <div className="editor-meta">
       {/* Plot Progress */}
       <MetaSection title="五线进度">
-        {PLOT_LINES.map(l => (
+        {plotLines.map(l => (
           <div key={l.id} className="progress-item">
             <span className="prog-label" style={{ color: `var(--color-${l.color})` }}>{l.name}</span>
             <div className="prog-bar">
@@ -162,7 +197,7 @@ function MetaPanel() {
           <div className="mb-3">
             <div style={{ fontSize: '0.68rem', color: 'var(--color-info)', fontFamily: 'var(--font-mono)', marginBottom: '6px' }}>种植 ↓</div>
             {scene.foreshadow.planted.map(fid => {
-              const f = FORESHADOWS.find(x => x.id === fid)
+              const f = foreshadows.find(x => x.id === fid)
               return f ? <ForeshadowTag key={fid} item={{ ...f, status: 'planted' }} size="sm" /> : null
             })}
           </div>
@@ -171,7 +206,7 @@ function MetaPanel() {
           <div>
             <div style={{ fontSize: '0.68rem', color: 'var(--color-warning)', fontFamily: 'var(--font-mono)', marginBottom: '6px' }}>触发 ⟫</div>
             {scene.foreshadow.triggered.map(fid => {
-              const f = FORESHADOWS.find(x => x.id === fid)
+              const f = foreshadows.find(x => x.id === fid)
               return f ? <ForeshadowTag key={fid} item={{ ...f, status: 'reinforced' }} size="sm" /> : null
             })}
           </div>
@@ -184,7 +219,7 @@ function MetaPanel() {
       {/* Characters */}
       <MetaSection title="出场角色" count={chapter.characters.length}>
         {chapter.characters.map(name => {
-          const c = CHARACTERS.find(x => x.name === name)
+          const c = characters.find(x => x.name === name)
           return c ? (
             <div key={name} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0' }}>
               <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: `var(--color-${c.color})` }} />
@@ -195,18 +230,28 @@ function MetaPanel() {
         })}
       </MetaSection>
 
-      {/* Validation */}
-      <MetaSection title="校验状态">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {['POV 角色存在且存活', '地点在知识图谱中', '冲突类型已声明', '五线进度单调递增', '伏笔状态转换合法'].map(rule => (
-            <div key={rule} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem' }}>
-              <span style={{ color: 'var(--color-success)' }}>✓</span>
-              <span style={{ color: 'var(--color-text-secondary)' }}>{rule}</span>
+      <MetaSection title="校验状态 · N-6.2">
+        <div className="validation-list">
+          {validation.checks.map(c => (
+            <div key={c.id} className="validation-row">
+              <span className={c.ok ? 'val-ok' : 'val-fail'}>{c.ok ? '✓' : '✗'}</span>
+              <span>{c.label}</span>
             </div>
           ))}
         </div>
-        <div style={{ marginTop: '12px', padding: '8px 12px', background: 'rgba(122, 184, 122, 0.08)', borderRadius: '6px', fontSize: '0.75rem', color: 'var(--color-success)', textAlign: 'center', fontFamily: 'var(--font-mono)' }}>
-          ✓ 全部通过 · 0 错误 · 0 警告
+        {validation.issues.length > 0 && (
+          <ul className="validation-issues">
+            {validation.issues.map((issue, i) => (
+              <li key={i} className={issue.level === 'error' ? 'issue-error' : 'issue-warn'}>
+                {issue.ruleId && <code>{issue.ruleId}</code>} {issue.message}
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className={`validation-summary ${validation.passed ? 'val-pass' : 'val-fail-box'}`}>
+          {validation.passed
+            ? `✓ 通过 · ${validation.warningCount} 警告`
+            : `✗ ${validation.errorCount} 错误 · ${validation.warningCount} 警告`}
         </div>
       </MetaSection>
     </div>
@@ -227,8 +272,6 @@ function MetaSection({ title, count, children }) {
 
 // ─── Main View ───
 export default function ContentView() {
-  const { scene } = useNovel()
-
   return (
     <>
       <ChapterList />

@@ -1,5 +1,3 @@
-# Novel - AI 辅助小说写作平台
-
 ## 📖 项目简介
 
 Novel 是一个集 **AI 辅助写作**、**小说管理**、**角色设计**、**世界观构建**于一体的全功能小说创作平台。基于 **Snowflake Novel Architecture v2.0（雪花叙事架构）**，提供从世界观构建→全局叙事规划→章节蓝图→场景迭代写作→实时校验→修订交付的完整 7 阶段创作管线。通过先进的 AI 技术，帮助作家快速生成灵感、完善剧情、管理故事世界。
@@ -8,41 +6,41 @@ Novel 是一个集 **AI 辅助写作**、**小说管理**、**角色设计**、*
 
 ### ❄️ 雪花叙事架构 v2.0（7 阶段创作管线）
 
-#### 阶段一：世界观与规则构建
-- **角色库**：创建角色档案，定义人物弧线（arc）、成长轨迹、关系网
-- **地点库**：管理场景地点、地理关系、出现规则
-- **力量体系**：定义超自然能力、代价与约束
-- **时间线**：历史纪年与关键事件编年
-- **约束规则库**：硬规则（absolute）与软规则（soft）双轨制，写作指南管理
+#### 阶段一：世界观与规则构建 ✅
+- **角色库** (N-1.1)：创建角色档案，定义人物弧线（arc）、成长轨迹、关系网
+- **地点库** (N-1.2)：管理场景地点，含类型、时代、氛围、互连关系
+- **力量体系** (N-1.3)：定义超自然能力、规则、代价与来源
+- **时间线** (N-1.4)：历史纪年与关键事件编年，含时代标签与重要性分级
+- **约束规则库** (N-1.5)：硬规则（absolute）与软规则（soft）双轨制，写作指南管理
 
-#### 阶段二：全局叙事规划
+#### 阶段二：全局叙事规划 ✅
 - **三幕结构**：宏观节奏、情感曲线、中点反转设计
 - **五线规划**：主线、感情线、反派线、世界观线、主题线，含里程碑与进度追踪
-- **伏笔网设计**：伏笔节点（F01–Fn）、因果/强化/矛盾/铺垫边，含种植/触发/回收生命周期
+- **伏笔网设计** (N-2.3)：伏笔节点（F01–Fn）完整管理界面，支持添加/编辑/删除伏笔，含种植/触发/回收生命周期、重要度分级、deadline 设置
 
 #### 阶段三：协同任务分配
 - **协同面板**：作者分配、章节归属、交接日志
 
-#### 阶段四：分册章节蓝图
-- **分册骨架**：多册划分，钩子/中点/高潮场景标记
-- **逐章大纲**：60 章完整大纲，每章含 POV、地点、冲突类型、伏笔活动元数据
+#### 阶段四：分册章节蓝图 ✅
+- **分册骨架** (N-4.1)：多册划分管理界面，支持添加/编辑/删除分册，含钩子/中点/高潮场景标记、章节范围设置
+- **逐章大纲** (N-4.2)：章节完整编辑界面，支持 POV、地点、目标字数、状态管理，以及叙事线关联
 
-#### 阶段五：场景迭代写作
-- **场景生成循环**：生成 → 校验 → 人工确认 → 锁定写入
+#### 阶段五：场景迭代写作 ✅
+- **场景生成循环** (N-5.1)：生成 → 校验 → 人工确认 → 锁定写入，支持场景添加/删除管理
 - **场景节拍（Beats）**：每个场景拆解为 4–6 个叙事节拍
 - **冲突类型声明**：内心冲突、人际冲突、外部威胁等
 - **五维进度跟踪**：感情、剧情、悬疑、世界观、角色维度实时进度条
 
-#### 阶段六：实时校验与协同调整
-- **伏笔看板**：超期告警、回收推荐、状态统计
+#### 阶段六：实时校验与协同调整 ✅
+- **伏笔看板** (N-6.1)：超期告警、回收推荐、状态统计，含回收率、状态分布可视化、即将到期提示
 - **约束扫描**：绝对规则检查（如"已死角色不能出场"）、软规则建议
 - **校验清单**：POV 角色存活、地点在知识图谱中、冲突类型已声明、五线进度单调递增、伏笔状态转换合法
 
-#### 阶段七：修订闭环与交付
-- **伏笔终审**：全伏笔回收率审查
-- **弧线完成度**：角色弧线 + 叙事线完成度审计
-- **规则清零**：inconsistency_log 残留清零
-- **终审报告**：健康度评分、修订优先级、交付决策
+#### 阶段七：修订闭环与交付 ✅
+- **伏笔终审** (N-7.1)：全伏笔回收率审查
+- **弧线完成度** (N-7.2)：角色弧线 + 叙事线完成度审计
+- **规则清零** (N-7.3)：inconsistency_log 残留清零
+- **终审报告** (N-7.4)：健康度综合评分、修订优先级、交付决策
 
 ### 📝 AI 写作工具
 - **场景级 AI 生成**：基于上下文（角色档案 + 活跃伏笔 + 前一场景摘要）智能生成场景 JSON
@@ -85,7 +83,7 @@ Novel 是一个集 **AI 辅助写作**、**小说管理**、**角色设计**、*
 ## 🛠 技术栈
 
 ### 前端
-框架：Next.js 16 (App Router)
+框架：React/Vite 架构
 UI 组件：React 19 + Tailwind CSS 4
 状态管理：React Context + useReducer
 富文本编辑器：Tiptap 3.x (ProseMirror)
@@ -170,110 +168,80 @@ ORM：Prisma
 
 
 ### 项目结构
-novel/
-├── .env.local                        ← 环境变量 (API Key / DB URL / JWT Secret)
-├── next.config.js                    ← Next.js 配置
+
+```
+Novel/
+├── index.html
+├── vite.config.js
+├── eslint.config.js
 ├── package.json
-├── tsconfig.json
-├── prisma/
-│   ├── schema.prisma                 ← 数据库模型定义
-│   ├── migrations/                   ← 迁移文件
-│   └── seed.ts                       ← 种子数据 (示例项目)
+│
+├── 小说流程.md
+├── 状态节点.md
+├── 小说结构模型v2.0.md              # 规范 JSON Schema
+├── 小说结构模型v2.1.md              # 运行时 JSON Schema
+├── README.md
+├── README.local.md
 │
 └── src/
-    ├── app/
-    │   ├── layout.tsx                ← 根布局 (字体加载 / 主题)
-    │   ├── page.tsx                  ← 首页
-    │   │
-    │   ├── (dashboard)/              ← 路由组 (共享侧边栏布局)
-    │   │   ├── layout.tsx            ← Dashboard 布局 (Sidebar + Header)
-    │   │   ├── structure/
-    │   │   │   └── page.tsx          ← 小说结构生成视图
-    │   │   ├── content/
-    │   │   │   └── page.tsx          ← 小说内容创作视图
-    │   │   └── settings/
-    │   │       └── page.tsx          ← AI 模型设置视图
-    │   │
-    │   └── api/
-    │       ├── ai/
-    │       │   ├── generate/route.ts ← AI 生成接口 (场景/结构/大纲)
-    │       │   ├── validate/route.ts ← 约束校验接口
-    │       │   └── analyze/route.ts  ← 节奏分析/伏笔分析接口
-    │       ├── project/
-    │       │   ├── route.ts          ← 项目 CRUD
-    │       │   └── [id]/route.ts     ← 单项目操作
-    │       ├── chapter/
-    │       │   └── route.ts          ← 章节 CRUD
-    │       ├── scene/
-    │       │   └── route.ts          ← 场景 CRUD
-    │       └── auth/
-    │           ├── login/route.ts    ← 登录
-    │           └── register/route.ts ← 注册
+    ├── main.jsx                       # 入口
+    ├── App.jsx                        # 四视图壳（home / structure / content / settings）
+    ├── store.jsx                      # Context + useReducer，节点/协同/持久化
+    ├── data.js                        # 静态演示片段
+    ├── index.css                      # 全局样式
     │
     ├── components/
-    │   ├── ui.tsx                    ← 基础组件 (Badge / ProgressBar / Btn / Card / Dot)
-    │   ├── Sidebar.tsx
-    │   ├── Header.tsx
+    │   ├── ui.jsx                     # Badge / ProgressBar / Btn 等
+    │   ├── Sidebar.jsx
+    │   ├── Header.jsx
+    │   │
+    │   ├── home/
+    │   │   ├── HomeView.jsx           # N-0 项目首页、导入导出
+    │   │   └── NodeProgressPanel.jsx  # 七阶段节点进度总览
     │   │
     │   ├── structure/
-    │   │   ├── StructureView.tsx
-    │   │   ├── PhaseTabs.tsx
-    │   │   ├── NodeCard.tsx
-    │   │   ├── CharacterGrid.tsx
-    │   │   ├── ConstraintList.tsx
-    │   │   ├── ForeshadowGraph.tsx        ← ECharts Graph (力导向图)
-    │   │   ├── CharacterRelationGraph.tsx  ← ECharts Graph (复用)
-    │   │   ├── PlotLineCanvas.tsx          ← Canvas 五线进度
-    │   │   ├── ActStructureChart.tsx       ← ECharts 三幕节奏图
-    │   │   ├── EmotionCurveChart.tsx       ← ECharts 情绪折线图
-    │   │   └── ChapterOutline.tsx
+    │   │   ├── StructureView.jsx      # 七阶段 Tab + NodeCard + StaleBanner
+    │   │   ├── CharacterPanel.jsx     # N-1.1 角色库
+    │   │   ├── LocationPanel.jsx      # N-1.2 地点库
+    │   │   ├── MagicPanel.jsx         # N-1.3 力量体系
+    │   │   ├── TimelinePanel.jsx      # N-1.4 时间线
+    │   │   ├── ConstraintPanel.jsx    # N-1.5 约束规则
+    │   │   ├── ActPlotPanel.jsx       # N-2.1 / N-2.2 三幕与五线
+    │   │   ├── ForeshadowPanel.jsx    # N-2.3 伏笔网
+    │   │   ├── CollaborationPanel.jsx # N-3.1 作者 / 章节归属 / 交接
+    │   │   ├── VolumePanel.jsx        # N-4.1 分册骨架
+    │   │   ├── ChapterPanel.jsx       # N-4.2 逐章大纲
+    │   │   ├── ForeshadowBoard.jsx    # N-6.1 伏笔看板
+    │   │   ├── ConstraintScanPanel.jsx    # N-6.2 全场景约束扫描
+    │   │   ├── CollaborationSyncPanel.jsx # N-6.3 协同同步日志
+    │   │   └── FinalReport.jsx        # N-7.1～N-7.4 终审报告
     │   │
     │   ├── content/
-    │   │   ├── ContentView.tsx
-    │   │   ├── ChapterList.tsx
-    │   │   ├── SceneEditor.tsx            ← Tiptap EditorContent
-    │   │   ├── SceneTabs.tsx
-    │   │   ├── MetaPanel.tsx
-    │   │   ├── ConflictBar.tsx
-    │   │   ├── BeatsList.tsx
-    │   │   ├── ForeshadowTag.tsx
-    │   │   └── ValidationPanel.tsx
+    │   │   └── ContentView.jsx        # N-5.1 章节 + 场景 + 校验侧栏
     │   │
     │   └── settings/
-    │       ├── SettingsView.tsx
-    │       ├── ModelConfig.tsx
-    │       ├── GenerationParams.tsx
-    │       ├── StyleConfig.tsx
-    │       └── SchemaBinding.tsx
+    │       └── SettingsView.jsx       # AI 模型参数（待接 API）
     │
-    ├── lib/
-    │   ├── db.ts                        ← Prisma Client 单例
-    │   ├── auth.ts                      ← JWT 签发 / 验证 / 中间件
-    │   ├── ai-client.ts                 ← OpenAI 兼容接口统一封装
-    │   ├── context-orchestrator.ts      ← 上下文编排器 (智能裁剪)
-    │   ├── foreshadow-engine.ts         ← 伏笔状态机逻辑
-    │   ├── constraints-engine.ts        ← 约束规则执行
-    │   ├── progress-aggregator.ts       ← 进度自动计算
-    │   └── schema-validator.ts          ← JSON Schema 校验
-    │
-    ├── hooks/
-    │   ├── useAI.ts                     ← AI API 调用 (React Hook)
-    │   ├── useValidation.ts             ← 前端校验逻辑
-    │   ├── useProject.ts                ← 项目数据 CRUD
-    │   └── useLocalStorage.ts           ← 本地持久化
-    │
-    ├── store/
-    │   ├── NovelProvider.tsx            ← 全局状态 Context Provider
-    │   └── types.ts                     ← 状态类型定义
-    │
-    ├── types/
-    │   ├── novel.ts                     ← 小说数据结构类型
-    │   ├── schema.ts                    ← JSON Schema 类型
-    │   └── api.ts                       ← API 请求/响应类型
-    │
-    └── styles/
-        └── fonts.ts                     ← 字体加载配置
-### 数据库模型 (Prisma Schema)
+    └── lib/
+        ├── index.js                   # 模块统一导出
+        ├── project.js                 # 默认种子、归一化、导出
+        ├── nodes.js                   # 阶段节点、依赖、回溯
+        ├── node-progress.js           # 节点进度汇总
+        ├── collaboration.js           # N-3.1 / N-6.3 协同数据
+        ├── storage.js                 # localStorage + JSON 文件 IO
+        ├── constraints-engine.js      # 场景 / 全项目约束校验
+        ├── foreshadow-engine.js       # 伏笔状态机
+        ├── progress-aggregator.js     # 进度与健康度
+        ├── context-orchestrator.js    # 节点上下文裁剪 (≤8KB)
+        ├── schema-validator.js        # 运行时 Schema 校验
+        ├── ai-client.js               # OpenAI 兼容封装（UI 待接入）
+        └── node-executor.js           # 六步节点循环（模拟）
+```
+
+**说明**：`PhaseTabs`、`NodeCard` 内嵌于 `StructureView.jsx`；`ContentView.jsx` 内嵌章节列表、场景 Tab、MetaPanel、校验列表。
+
+
+### 数据库模型（目标全栈 · Prisma Schema）
 
 generator client {
   provider = "prisma-client-js"
@@ -330,6 +298,49 @@ model Scene {
   metadata  String  @default("{}")  // JSON: conflict + beats + foreshadow + plot_lines_progress
   sortOrder Int     @default(0)
 }
+
+
+## 开发进度（Vite 原型 · 对齐 `状态节点.md`）
+
+> 详细映射见 [`状态节点.md`](./状态节点.md)。本地运行说明见 [`README.local.md`](./README.local.md)。
+
+### 节点实现一览
+
+| 节点 | 功能 | 原型 | 说明 |
+|------|------|------|------|
+| N-0 | 项目首页 | ✅ | `HomeView`：进度、导入导出、节点总览 |
+| N-1.1～N-1.5 | 世界观五库 | ✅ | 各 Panel CRUD + 回溯标记 |
+| N-2.1～N-2.2 | 三幕 / 五线 | ✅ | `ActPlotPanel` 可编辑 |
+| N-2.3 | 伏笔网 | ✅ | `ForeshadowPanel` |
+| N-3.1 | 协同面板 | ✅ | `CollaborationPanel` 作者/章节归属/交接 CRUD |
+| N-4.1～N-4.2 | 分册 / 逐章 | ✅ | `VolumePanel` `ChapterPanel` |
+| N-5.1 | 场景写作 | ✅ | `ContentView` + 分册筛选章节 |
+| N-6.1 | 伏笔看板 | ✅ | `ForeshadowBoard` |
+| N-6.2 | 约束扫描 | ✅ | `ConstraintScanPanel` 全场景扫描 + 跳转 |
+| N-6.3 | 协同同步 | ✅ | `CollaborationSyncPanel` 同步日志 CRUD + 冲突检测 |
+| N-7.1～N-7.4 | 终审闭环 | ✅ | `FinalReport` 健康度 |
+
+图例：✅ 可用 · 🔶 部分 · ⏭️ 跳过/Phase 2
+
+### 六步循环（节点工作流）
+
+| 步骤 | 原型状态 |
+|------|----------|
+| ① 上下文编排 | ✅ `context-orchestrator.js` |
+| ② AI 生成 | 🔶 `ai-client` / `node-executor` 有库，UI 模拟 |
+| ③ 自动校验 | ✅ 场景校验 + 全项目扫描 |
+| ④ Web 展示 | ✅ 结构/内容视图 |
+| ⑤ 人工确认 | ✅ 面板编辑 |
+| ⑥ 锁定写入 | ✅ localStorage + **节点卡片「标记完成」** |
+
+### 待开发（全栈 / 增强）
+
+| 项 | 说明 |
+|----|------|
+| Next.js API + Prisma | 后端持久化与 AI 路由 |
+| Tiptap / ECharts | 富文本与关系图可视化 |
+| WebSocket 协同 | N-3.1 / N-6.3 完整实现 |
+| AI 真实调用 | 设置页 API Key 接入生成流程 |
 
 
 打包体积预估

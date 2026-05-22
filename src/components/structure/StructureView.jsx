@@ -1,20 +1,35 @@
 // src/components/structure/StructureView.jsx
 import { useNovel } from '../../store'
-import { PHASES, CHARACTERS, PLOT_LINES, FORESHADOWS, CONSTRAINTS, CHAPTERS, ACTS } from '../../data'
-import { ForeshadowTag } from '../ui'
+import { getEffectiveNodeStatus, NODE_STATUS, isNodeCompleted } from '../../lib/nodes'
+import CharacterPanel from './CharacterPanel'
+import ConstraintPanel from './ConstraintPanel'
+import LocationPanel from './LocationPanel'
+import MagicPanel from './MagicPanel'
+import TimelinePanel from './TimelinePanel'
+import ForeshadowPanel from './ForeshadowPanel'
+import VolumePanel from './VolumePanel'
+import ChapterPanel from './ChapterPanel'
+import ForeshadowBoard from './ForeshadowBoard'
+import FinalReport from './FinalReport'
+import CollaborationPanel from './CollaborationPanel'
+import CollaborationSyncPanel from './CollaborationSyncPanel'
+import ConstraintScanPanel from './ConstraintScanPanel'
+import ActPlotPanel from './ActPlotPanel'
+import NodeWorkflowPanel from './NodeWorkflowPanel'
+import { canNodeAiGenerate } from '../../lib/node-ai-config'
 
-// ─── Phase Tabs ───
 function PhaseTabs() {
-  const { phase, setPhase } = useNovel()
+  const { phases, phase, setPhase } = useNovel()
+  const phaseDot = { done: 'done', progress: 'progress', skip: 'skip', blocked: 'blocked', locked: 'locked' }
   return (
     <div className="struct-topbar">
-      {PHASES.map((p, i) => (
+      {phases.map((p, i) => (
         <div
           key={p.id}
           onClick={() => setPhase(i)}
           className={`phase-tab ${i === phase ? 'active' : ''}`}
         >
-          <span className={`dot dot-${p.status}`} />
+          <span className={`dot dot-${phaseDot[p.status] || 'progress'}`} />
           阶段{p.id}: {p.name}
         </div>
       ))}
@@ -22,226 +37,336 @@ function PhaseTabs() {
   )
 }
 
-// ─── Node Card ───
-function NodeCard({ node }) {
-  const statusClass = { done: 'badge-done', progress: 'badge-progress', locked: 'badge-locked', skip: 'badge-locked' }
-  const statusText = { done: '已完成', progress: '进行中', locked: '已锁定', skip: '已跳过' }
+function NodeWorkflowSection() {
+  const { selectedNodeKey, workflowOpen, clearNodeWorkflow } = useNovel()
+  if (!workflowOpen || !selectedNodeKey) return null
   return (
-    <div className="struct-card">
+    <NodeWorkflowPanel
+      nodeKey={selectedNodeKey}
+      onClose={clearNodeWorkflow}
+    />
+  )
+}
+
+function NodeCard({ node, project, selectedNodeKey, onSelect, onComplete, onSetProgress, onRefine }) {
+  const effective = getEffectiveNodeStatus(node, project)
+  const meta = NODE_STATUS[effective] || NODE_STATUS.unlocked
+  const isSelected = selectedNodeKey === node.nodeKey
+  const blockedDeps = (node.dependsOn || []).filter(dep => !isNodeCompleted(dep, project))
+  const canComplete = ['unlocked', 'progress', 'stale_review', 'stale_rewrite'].includes(effective)
+
+  return (
+    <div
+      className={`struct-card node-card node-${effective} ${isSelected ? 'node-selected' : ''}`}
+      onClick={() => onSelect?.(isSelected ? null : node.nodeKey)}
+    >
       <div className="card-header">
         <span className="card-title">{node.name}</span>
-        <span className={`card-status ${statusClass[node.status]}`}>{statusText[node.status]}</span>
+        <span className={`card-status badge-${meta.badge}`}>{meta.label}</span>
       </div>
       <div className="card-desc">{node.desc}</div>
+      {effective === 'blocked' && blockedDeps.length > 0 && (
+        <div className="card-blocked-hint">等待完成：{blockedDeps.join('、')}</div>
+      )}
       <div className="card-meta">
-        <span>节点 {node.id}</span>
+        <span>{node.nodeKey}</span>
         <span>{node.count} 条目</span>
+        {node.dependsOn?.length > 0 && (
+          <span title={node.dependsOn.join(', ')}>依赖 {node.dependsOn.length}</span>
+        )}
       </div>
+      {((canNodeAiGenerate(node.nodeKey) && onRefine) ||
+        ((canComplete || effective === 'completed') && onComplete)) && (
+        <div className="node-card-actions" onClick={e => e.stopPropagation()}>
+          {canNodeAiGenerate(node.nodeKey) && onRefine && (
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => onRefine(node.nodeKey)}>
+              ✦ 完善模型
+            </button>
+          )}
+          {canComplete && onComplete && (
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => onComplete(node.nodeKey)}>
+              ✓ 标记完成
+            </button>
+          )}
+          {effective === 'completed' && onSetProgress && (
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => onSetProgress(node.nodeKey)}>
+              重新编辑
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }
 
-// ─── Phase 1: World Building ───
+function StaleBanner() {
+  const { staleMarkers, staleCount, clearStaleMarkers } = useNovel()
+  if (staleCount === 0) return null
+
+  const items = Object.entries(staleMarkers).map(([key, level]) => {
+    const label = level === 'rewrite' ? '待重写' : '待审查'
+    const sceneMatch = key.match(/^N-5\.1:(.+)$/)
+    const chMatch = key.match(/^N-4\.2:ch(\d+)$/)
+    let detail = key
+    if (sceneMatch) detail = `场景 ${sceneMatch[1]}`
+    if (chMatch) detail = `第 ${chMatch[1]} 章大纲`
+    return { key, level, label, detail }
+  })
+
+  return (
+    <div className="stale-banner">
+      <div className="stale-banner-header">
+        <strong>回溯提醒</strong> · 上游数据已变更，以下节点需处理（{staleCount}）
+        <button type="button" className="btn btn-ghost btn-sm" onClick={clearStaleMarkers}>清除标记</button>
+      </div>
+      <ul className="stale-list">
+        {items.map(({ key, level, label, detail }) => (
+          <li key={key} className={level === 'rewrite' ? 'stale-rewrite' : 'stale-review'}>
+            <span className="stale-tag">{label}</span>
+            <span className="stale-key">{key}</span>
+            <span className="stale-detail">{detail}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function useNodeActions() {
+  const { completeNode, setNodeStatus, openNodeWorkflow } = useNovel()
+  return {
+    onComplete: completeNode,
+    onSetProgress: nodeKey => setNodeStatus(nodeKey, 'progress'),
+    onRefine: openNodeWorkflow,
+  }
+}
+
 function Phase1() {
-  const { setView } = useNovel()
-  const phase = PHASES[0]
+  const { phases, project, selectedNodeKey, setSelectedNodeKey } = useNovel()
+  const nodeActions = useNodeActions()
+  const phase = phases[0]
+
+  const getPanelByNodeKey = (key) => {
+    switch (key) {
+      case 'N-1.1': return <CharacterPanel />
+      case 'N-1.2': return <LocationPanel />
+      case 'N-1.3': return <MagicPanel />
+      case 'N-1.4': return <TimelinePanel />
+      case 'N-1.5': return <ConstraintPanel />
+      default: return null
+    }
+  }
+
+  const selectedPanel = getPanelByNodeKey(selectedNodeKey)
+
   return (
     <div className="struct-content fade-up">
+      <StaleBanner />
       <div className="struct-grid">
-        {phase.nodes.slice(0, 4).map(n => <NodeCard key={n.id} node={n} />)}
+        {phase.nodes.map(n => (
+          <NodeCard
+            key={n.nodeKey}
+            node={n}
+            project={project}
+            selectedNodeKey={selectedNodeKey}
+            onSelect={setSelectedNodeKey}
+            {...nodeActions}
+          />
+        ))}
       </div>
-
-      {/* Characters */}
-      <div className="struct-section">
-        <div className="struct-section-header">
-          <h3>角色库 · {CHARACTERS.length} 位角色</h3>
-          <div className="flex gap-2">
-            <button className="btn btn-ghost btn-sm">+ 添加角色</button>
-            <button className="btn btn-primary btn-sm">✦ AI 生成</button>
-          </div>
+      
+      {selectedPanel && (
+        <div className="selected-panel">
+          {selectedPanel}
         </div>
-        <div className="char-grid">
-          {CHARACTERS.map(c => (
-            <div key={c.name} className="char-card" style={{ borderLeftColor: `var(--color-${c.color})`, borderLeftWidth: '3px' }}>
-              <div className="char-card-header">
-                <span className="char-name">{c.name}</span>
-                <span className="badge badge-progress">{c.role}</span>
-              </div>
-              <div className="char-arc">{c.arc}</div>
-              <div className="char-meta">
-                <span>状态: {c.status}</span>
-                <span>弧线: {Math.round(c.progress * 100)}%</span>
-              </div>
-              <div className="progress-bar">
-                <div className="fill" style={{ width: `${c.progress * 100}%`, background: `var(--color-${c.color})` }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Constraints */}
-      <div className="struct-section">
-        <div className="struct-section-header">
-          <h3>约束规则库 · {CONSTRAINTS.length} 条规则</h3>
-          <button className="btn btn-ghost btn-sm">+ 添加规则</button>
-        </div>
-        <div className="rule-list">
-          {CONSTRAINTS.map(r => {
-            const borderColor = r.type === 'absolute' ? 'var(--color-error)' : r.type === 'soft' ? 'var(--color-warning)' : 'var(--color-text-muted)'
-            return (
-              <div key={r.id} className="rule-item" style={{ borderLeftColor: borderColor, borderLeftWidth: '3px', borderLeftStyle: 'solid' }}>
-                <span className="rule-id">{r.id}</span>
-                <span className={`badge badge-locked`} style={{ background: r.type === 'absolute' ? 'rgba(196, 107, 107, 0.15)' : r.type === 'soft' ? 'rgba(212, 168, 83, 0.15)' : 'rgba(107, 99, 90, 0.2)', color: borderColor }}>{r.type}</span>
-                <span className="rule-name">{r.name}</span>
-                <span className="rule-desc">{r.desc}</span>
-              </div>
-            )
-          })}
-        </div>
-      </div>
+      )}
+      
+      {!selectedPanel && (
+        <>
+          <CharacterPanel />
+          <LocationPanel />
+          <MagicPanel />
+          <TimelinePanel />
+          <ConstraintPanel />
+          <p className="phase-hint">
+            试用：将「林渊」设为 <strong>死亡</strong>，再到「内容创作」点校验，可见 R-001 规则生效。
+          </p>
+        </>
+      )}
     </div>
   )
 }
 
-// ─── Phase 2: Narrative Planning ───
 function Phase2() {
+  const { project, selectedNodeKey, setSelectedNodeKey, phases } = useNovel()
+  const nodeActions = useNodeActions()
+  const phase = phases[1]
+
   return (
     <div className="struct-content fade-up">
-      <div className="two-col-grid">
-        {/* Three Acts */}
-        <div className="struct-card">
-          <div className="card-header">
-            <span className="card-title">三幕结构</span>
-            <span className="badge badge-done">已完成</span>
-          </div>
-          {ACTS.map(act => (
-            <div key={act.name} className="act-row">
-              <div className="act-row-header">
-                <span className="act-name">{act.name}</span>
-                <span className="act-range">{act.range}</span>
-              </div>
-              <div className="progress-bar">
-                <div className="fill" style={{ width: `${act.width}%` }} />
-              </div>
-              <div className="act-goal">{act.goal}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Five Lines */}
-        <div className="struct-card">
-          <div className="card-header">
-            <span className="card-title">五线规划</span>
-            <span className="badge badge-done">已完成</span>
-          </div>
-          {PLOT_LINES.map(l => (
-            <div key={l.id} className="progress-item">
-              <span className="prog-label" style={{ color: `var(--color-${l.color})` }}>{l.name}</span>
-              <div className="prog-bar">
-                <div className="prog-fill" style={{ width: `${l.progress * 100}%`, backgroundColor: `var(--color-${l.color})` }} />
-              </div>
-              <span className="prog-value">{Math.round(l.progress * 100)}%</span>
-            </div>
-          ))}
-          <div className="milestone">当前里程碑: {PLOT_LINES[0].milestone}</div>
-        </div>
+      <StaleBanner />
+      <div className="struct-grid">
+        {phase.nodes.map(n => (
+          <NodeCard
+            key={n.nodeKey}
+            node={n}
+            project={project}
+            selectedNodeKey={selectedNodeKey}
+            onSelect={setSelectedNodeKey}
+            {...nodeActions}
+          />
+        ))}
       </div>
-
-      {/* Foreshadow Network */}
-      <div className="struct-section">
-        <div className="struct-section-header">
-          <h3>伏笔网 · {FORESHADOWS.length} 条伏笔</h3>
-          <div className="flex gap-2">
-            <button className="btn btn-ghost btn-sm">+ 添加伏笔</button>
-            <button className="btn btn-primary btn-sm">✦ AI 推荐</button>
-          </div>
-        </div>
-        <div className="fs-list">
-          {FORESHADOWS.map(f => <ForeshadowTag key={f.id} item={f} />)}
-        </div>
-      </div>
+      <ActPlotPanel />
+      <ForeshadowPanel />
     </div>
   )
 }
 
-// ─── Phase 4: Chapter Blueprint ───
 function Phase4() {
-  const { setView } = useNovel()
-  const statusBorder = { done: 'border-l-verdant', progress: 'border-l-ochre', locked: 'border-l-faded' }
-  const statusText = { done: '已完成', progress: '写作中', locked: '待解锁' }
-  const statusBadge = { done: 'badge-done', progress: 'badge-progress', locked: 'badge-locked' }
+  const { project, phases, selectedNodeKey, setSelectedNodeKey } = useNovel()
+  const nodeActions = useNodeActions()
+  const phase = phases[3]
 
   return (
     <div className="struct-content fade-up">
-      <div className="struct-section">
-        <div className="struct-section-header">
-          <h3>逐章大纲 · {CHAPTERS.length}/60 章</h3>
-          <div className="flex gap-2">
-            <button className="btn btn-ghost btn-sm">展开全部</button>
-            <button className="btn btn-primary btn-sm">✦ AI 生成下一章</button>
-          </div>
-        </div>
-        <div className="chapter-list">
-          {CHAPTERS.map(ch => (
-            <div key={ch.id} className="chapter-row" style={{ borderLeftColor: statusBorder[ch.status] === 'border-l-verdant' ? 'var(--color-success)' : statusBorder[ch.status] === 'border-l-ochre' ? 'var(--color-warning)' : 'var(--color-text-muted)', borderLeftWidth: '3px', borderLeftStyle: 'solid' }}>
-              <span className="ch-id">Ch{ch.id}</span>
-              <span className="ch-title">{ch.title}</span>
-              <span className="ch-words">{ch.words}/{ch.targetWords}字</span>
-              <span className="ch-scenes">{ch.scenes}场景</span>
-              <div className="ch-dots">
-                {ch.plotLines.map(id => {
-                  const l = PLOT_LINES.find(p => p.id === id)
-                  return <span key={id} className="dot-sm" style={{ backgroundColor: l ? `var(--color-${l.color})` : 'var(--color-text-muted)' }} />
-                })}
-              </div>
-              <span className={`badge ${statusBadge[ch.status]}`}>{statusText[ch.status]}</span>
-            </div>
-          ))}
-          <div className="chapter-more">
-            ⋯ 第 7-60 章大纲待生成 · 点击「AI 生成下一章」继续
-          </div>
-        </div>
+      <StaleBanner />
+      <div className="struct-grid">
+        {phase.nodes.map(n => (
+          <NodeCard
+            key={n.nodeKey}
+            node={n}
+            project={project}
+            selectedNodeKey={selectedNodeKey}
+            onSelect={setSelectedNodeKey}
+            {...nodeActions}
+          />
+        ))}
       </div>
+      <VolumePanel />
+      <ChapterPanel />
     </div>
   )
 }
 
-// ─── Phase 5: Scene Writing ───
 function Phase5() {
-  const { setView } = useNovel()
+  const { project, phases, setView, selectedNodeKey, setSelectedNodeKey } = useNovel()
+  const nodeActions = useNodeActions()
+  const phase = phases[4]
+
   return (
     <div className="struct-content fade-up">
+      <StaleBanner />
+      <div className="struct-grid">
+        {phase.nodes.map(n => (
+          <NodeCard
+            key={n.nodeKey}
+            node={n}
+            project={project}
+            selectedNodeKey={selectedNodeKey}
+            onSelect={setSelectedNodeKey}
+            {...nodeActions}
+          />
+        ))}
+      </div>
       <div className="empty-state">
         <div className="empty-icon">✏️</div>
-        <h3>场景迭代写作</h3>
-        <p>这是真正「落笔」的地方。每一个场景遵循固定的循环：AI 生成 → 自动校验 → 人工确认 → 锁定写入</p>
-        <button className="btn btn-primary btn-sm" onClick={() => setView('content')}>→ 进入内容创作</button>
+        <h3>场景迭代写作 · N-5.1</h3>
+        <p>生成 → 校验 → 人工确认 → 锁定写入</p>
+        <button type="button" className="btn btn-primary btn-sm" onClick={() => setView('content')}>→ 进入内容创作</button>
       </div>
     </div>
   )
 }
 
-// ─── Phase 6 & 7: Simple cards ───
-function SimplePhase({ phase }) {
+function Phase3() {
+  const { project, phases, selectedNodeKey, setSelectedNodeKey } = useNovel()
+  const nodeActions = useNodeActions()
+  const phase = phases[2]
+
   return (
     <div className="struct-content fade-up">
+      <StaleBanner />
       <div className="struct-grid">
-        {phase.nodes.map(n => <NodeCard key={n.id} node={n} />)}
+        {phase.nodes.map(n => (
+          <NodeCard
+            key={n.nodeKey}
+            node={n}
+            project={project}
+            selectedNodeKey={selectedNodeKey}
+            onSelect={setSelectedNodeKey}
+            {...nodeActions}
+          />
+        ))}
       </div>
+      <CollaborationPanel />
     </div>
   )
 }
 
-// ─── Main View ───
+function Phase6() {
+  const { project, selectedNodeKey, setSelectedNodeKey } = useNovel()
+  const nodeActions = useNodeActions()
+  const phase = project.phases[5]
+
+  return (
+    <div className="struct-content fade-up">
+      <StaleBanner />
+      <div className="struct-grid">
+        {phase.nodes.map(n => (
+          <NodeCard
+            key={n.nodeKey}
+            node={n}
+            project={project}
+            selectedNodeKey={selectedNodeKey}
+            onSelect={setSelectedNodeKey}
+            {...nodeActions}
+          />
+        ))}
+      </div>
+      <ForeshadowBoard />
+      <ConstraintScanPanel />
+      <CollaborationSyncPanel />
+    </div>
+  )
+}
+
+function Phase7() {
+  const { project, selectedNodeKey, setSelectedNodeKey } = useNovel()
+  const nodeActions = useNodeActions()
+  const phase = project.phases[6]
+
+  return (
+    <div className="struct-content fade-up">
+      <StaleBanner />
+      <div className="struct-grid">
+        {phase.nodes.map(n => (
+          <NodeCard
+            key={n.nodeKey}
+            node={n}
+            project={project}
+            selectedNodeKey={selectedNodeKey}
+            onSelect={setSelectedNodeKey}
+            {...nodeActions}
+          />
+        ))}
+      </div>
+      <FinalReport />
+    </div>
+  )
+}
+
 export default function StructureView() {
-  const { phase } = useNovel()
-  const renderers = [Phase1, Phase2, () => <SimplePhase phase={PHASES[2]} />, Phase4, Phase5, () => <SimplePhase phase={PHASES[5]} />, () => <SimplePhase phase={PHASES[6]} />]
+  const { phase, phases } = useNovel()
+  const renderers = [
+    Phase1, Phase2, Phase3, Phase4, Phase5, Phase6, Phase7,
+  ]
 
   return (
     <>
       <PhaseTabs />
-      <div className="struct-content">
+      <div className="struct-body">
+        <NodeWorkflowSection />
         {renderers[phase]?.()}
       </div>
     </>
