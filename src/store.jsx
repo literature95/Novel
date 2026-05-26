@@ -18,7 +18,7 @@ import { calculateHealthScore } from './lib/progress-aggregator'
 import { validateProject } from './lib/schema-validator'
 import { aggregateProgress } from './lib/progress-aggregator'
 import { createNodeExecutor } from './lib/node-executor'
-import { createNodeRunner } from './lib/node-runner'
+import { createNodeRunner } from './lib/node-executor'
 import { applyNodeGeneration } from './lib/apply-node-data'
 import { canNodeAiGenerate } from './lib/node-ai-config'
 import {

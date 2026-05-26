@@ -1,10 +1,12 @@
 /** 节点执行器 - 整合六步标准流程 */
 
 import { getNodeContext, formatContextForPrompt } from './context-orchestrator'
-import { getAIClient } from './ai-client'
+import { getAIClient, configureAIClient } from './ai-client'
 import { validateSchema, validateArray } from './schema-validator'
 import { aggregateProgress, completeNode } from './progress-aggregator'
 import { validateTransition, checkOverdue } from './foreshadow-engine'
+import { getNodeAiConfig } from './node-ai-config'
+import { applyNodeGeneration } from './apply-node-data'
 
 // 节点执行状态
 export const EXECUTION_STATUS = {
@@ -19,14 +21,18 @@ export const EXECUTION_STATUS = {
   FAILED: 'failed',                     // 失败
 }
 
-// 节点类型映射（决定调用哪个AI方法）
-const NODE_TYPE_MAP = {
-  'N-1.1': { generator: 'generateCharacters', schemaType: 'character' },
-  'N-1.2': { generator: 'generateLocations', schemaType: 'location' },
-  'N-1.3': { generator: 'generateMagicSystem', schemaType: 'magic' },
-  'N-1.4': { generator: 'generateTimeline', schemaType: 'timeline' },
-  'N-1.5': { generator: 'generateConstraints', schemaType: 'constraint' },
-  'N-5.1': { generator: 'generateScene', schemaType: 'scene' },
+// 节点类型映射到 schemaType
+const SCHEMA_TYPE_MAP = {
+  'N-1.1': 'character',
+  'N-1.2': 'location',
+  'N-1.3': 'magic',
+  'N-1.4': 'timeline',
+  'N-1.5': 'constraint',
+  'N-2.1': 'chapter',
+  'N-2.2': 'chapter',
+  'N-2.3': 'foreshadow',
+  'N-4.2': 'chapter',
+  'N-5.1': 'scene',
 }
 
 /**
@@ -38,6 +44,7 @@ export class NodeExecutor {
     this.nodeKey = nodeKey
     this.status = EXECUTION_STATUS.IDLE
     this.context = null
+    this.contextMeta = null
     this.generatedData = null
     this.validationResult = null
     this.errors = []
@@ -73,12 +80,13 @@ export class NodeExecutor {
     try {
       const result = getNodeContext(this.project, this.nodeKey)
       this.context = result.context
+      this.contextMeta = result
 
       if (result.trimmed) {
         this.warnings.push(`上下文内容已裁剪以符合大小限制（原始: ${result.originalSize} bytes，当前: ${result.size} bytes）`)
       }
 
-      return { success: true, context: this.context, warnings: this.warnings }
+      return { success: true, context: this.context, meta: result, warnings: this.warnings }
     } catch (error) {
       this.errors.push(`加载上下文失败: ${error.message}`)
       this.status = EXECUTION_STATUS.FAILED
@@ -99,31 +107,46 @@ export class NodeExecutor {
     this.errors = []
 
     try {
-      const nodeConfig = NODE_TYPE_MAP[this.nodeKey]
+      const nodeConfig = getNodeAiConfig(this.nodeKey)
       if (!nodeConfig) {
-        // 对于没有配置的节点，返回模拟数据
         this.generatedData = this.#generateMockData()
-        return { success: true, data: this.generatedData }
+        return { success: true, data: this.generatedData, source: 'mock' }
       }
 
-      const client = getAIClient()
-      const prompt = formatContextForPrompt(this.context)
-      
+      const client = configureAIClient(this.project.settings)
       const method = nodeConfig.generator
-      if (typeof client[method] === 'function') {
-        const count = options.count || 5
+      const count = options.count || nodeConfig.defaultCount || 5
+
+      if (typeof client[method] !== 'function') {
+        throw new Error(`未实现生成方法: ${method}`)
+      }
+
+      if (this.nodeKey === 'N-4.2') {
+        const chId = options.chapterId ?? this.project.chapters?.[0]?.id ?? 1
+        const ch = this.project.chapters?.find(c => c.id === chId) || { id: chId, title: `第${chId}章` }
+        this.generatedData = await client.generateChapterOutline(this.context, {
+          number: ch.id,
+          title: ch.title,
+        })
+      } else if (this.nodeKey === 'N-5.1') {
+        const ch = this.project.chapters?.[options.chapterIdx ?? 0]
+        this.generatedData = await client.generateScene(this.context, {
+          chapter: ch?.title,
+          pov: options.pov || ch?.characters?.[0],
+          setting: options.setting || ch?.locations?.[0],
+        })
+      } else if (nodeConfig.array) {
         this.generatedData = await client[method](this.context, count)
       } else {
-        throw new Error(`未知的生成方法: ${method}`)
+        this.generatedData = await client[method](this.context)
       }
 
-      return { success: true, data: this.generatedData }
+      return { success: true, data: this.generatedData, source: 'ai' }
     } catch (error) {
-      // 如果真实API失败，使用模拟数据
       console.warn('[NodeExecutor] AI生成失败，使用模拟数据:', error.message)
       this.generatedData = this.#generateMockData()
-      this.warnings.push('AI API调用失败，已使用模拟数据')
-      return { success: true, data: this.generatedData, warnings: this.warnings }
+      this.warnings.push(`API 不可用，已使用本地模拟数据：${error.message}`)
+      return { success: true, data: this.generatedData, source: 'mock', warnings: this.warnings }
     }
   }
 
@@ -184,19 +207,17 @@ export class NodeExecutor {
     this.errors = []
 
     try {
-      const nodeConfig = NODE_TYPE_MAP[this.nodeKey]
+      const schemaType = SCHEMA_TYPE_MAP[this.nodeKey]
       
-      if (nodeConfig && Array.isArray(this.generatedData)) {
-        // 数组类型数据的校验
-        const result = validateArray(this.generatedData, nodeConfig.schemaType)
+      if (schemaType && Array.isArray(this.generatedData)) {
+        const result = validateArray(this.generatedData, schemaType)
         this.validationResult = result
 
         if (!result.valid) {
           this.errors.push(...result.errors.map(e => `${e.path}: ${e.message}`))
         }
-      } else if (nodeConfig && typeof this.generatedData === 'object') {
-        // 单个对象的校验
-        const result = validateSchema(this.generatedData, nodeConfig.schemaType)
+      } else if (schemaType && typeof this.generatedData === 'object') {
+        const result = validateSchema(this.generatedData, schemaType)
         this.validationResult = result
 
         if (!result.valid) {
@@ -204,7 +225,6 @@ export class NodeExecutor {
         }
       }
 
-      // 额外的业务规则校验
       this.#validateBusinessRules()
 
       return {
@@ -307,66 +327,18 @@ export class NodeExecutor {
    * 步骤⑥：锁定写入
    * @returns {{success: boolean, project: Object, progress: Object}}
    */
-  async write() {
+  async write(options = {}) {
     this.status = EXECUTION_STATUS.WRITING
 
     try {
-      let updatedProject = { ...this.project }
-      const { nodeKey, generatedData } = this
-
-      // 根据节点类型写入对应数据
-      switch (nodeKey) {
-        case 'N-1.1':
-          updatedProject.characters = [
-            ...(updatedProject.characters || []),
-            ...generatedData
-          ]
-          break
-        case 'N-1.2':
-          updatedProject.locations = [
-            ...(updatedProject.locations || []),
-            ...generatedData
-          ]
-          break
-        case 'N-1.3':
-          updatedProject.magicSystem = [
-            ...(updatedProject.magicSystem || []),
-            ...generatedData
-          ]
-          break
-        case 'N-1.4':
-          updatedProject.timeline = [
-            ...(updatedProject.timeline || []),
-            ...generatedData
-          ]
-          break
-        case 'N-1.5':
-          updatedProject.constraints = [
-            ...(updatedProject.constraints || []),
-            ...generatedData
-          ]
-          break
-        case 'N-5.1':
-          // 获取当前章节ID
-          const currentChapterId = updatedProject.chapters?.[0]?.id || 1
-          if (!updatedProject.scenes) {
-            updatedProject.scenes = {}
-          }
-          if (!updatedProject.scenes[currentChapterId]) {
-            updatedProject.scenes[currentChapterId] = []
-          }
-          updatedProject.scenes[currentChapterId].push(generatedData)
-          break
-        default:
-          // 其他节点类型的写入逻辑
-          break
-      }
-
-      // 标记节点为完成并解锁下游
-      updatedProject = completeNode(nodeKey, updatedProject)
-
-      // 重新计算进度
-      updatedProject.progress = aggregateProgress(updatedProject)
+      const nodeConfig = getNodeAiConfig(this.nodeKey)
+      const mode = options.mode || (nodeConfig?.writeMode === 'replace' ? 'replace' : 'merge')
+      
+      const updatedProject = applyNodeGeneration(this.project, this.nodeKey, this.generatedData, {
+        mode: mode === 'patchChapter' ? 'merge' : mode,
+        chapterId: options.chapterId,
+        sceneChapterId: options.sceneChapterId ?? this.project.chapters?.[options.chapterIdx ?? 0]?.id,
+      })
 
       this.status = EXECUTION_STATUS.COMPLETED
 
@@ -380,6 +352,18 @@ export class NodeExecutor {
       this.status = EXECUTION_STATUS.FAILED
       return { success: false, errors: this.errors }
     }
+  }
+
+  commit(options = {}) {
+    const nodeConfig = getNodeAiConfig(this.nodeKey)
+    const mode = options.mode || (nodeConfig?.writeMode === 'replace' ? 'replace' : 'merge')
+    const updated = applyNodeGeneration(this.project, this.nodeKey, this.generatedData, {
+      mode: mode === 'patchChapter' ? 'merge' : mode,
+      chapterId: options.chapterId,
+      sceneChapterId: options.sceneChapterId ?? this.project.chapters?.[options.chapterIdx ?? 0]?.id,
+    })
+    this.status = EXECUTION_STATUS.COMPLETED
+    return { success: true, project: updated }
   }
 
   /**
@@ -473,5 +457,9 @@ export class NodeExecutor {
  * @returns {NodeExecutor}
  */
 export function createNodeExecutor(project, nodeKey) {
+  return new NodeExecutor(project, nodeKey)
+}
+
+export function createNodeRunner(project, nodeKey) {
   return new NodeExecutor(project, nodeKey)
 }

@@ -8,7 +8,6 @@ const STEPS = [
   { id: 2, name: 'AI 生成' },
   { id: 3, name: '自动校验' },
   { id: 4, name: '预览确认' },
-  { id: 5, name: '锁定写入' },
 ]
 
 export default function NodeWorkflowPanel({ nodeKey, onClose }) {
@@ -159,10 +158,10 @@ export default function NodeWorkflowPanel({ nodeKey, onClose }) {
           ② AI 生成草案
         </button>
         <button type="button" className="btn btn-ghost btn-sm" disabled={busy || !wf?.generatedData} onClick={handleValidate}>
-          ③ 校验
+          ③ 自动校验
         </button>
         <button type="button" className="btn btn-ghost btn-sm" disabled={busy || step < 3} onClick={handleCommit}>
-          ⑥ 锁定写入模型
+          ④ 锁定写入模型
         </button>
       </div>
 
@@ -199,7 +198,7 @@ export default function NodeWorkflowPanel({ nodeKey, onClose }) {
       )}
 
       <label className="workflow-preview-label">
-        ④ 生成预览（可编辑 JSON 后写入）
+        ④ 预览确认（可编辑 JSON 后写入）
         <textarea
           className="text-input workflow-preview-json"
           rows={12}

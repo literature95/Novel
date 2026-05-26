@@ -94,6 +94,7 @@ export {
   EXECUTION_STATUS,
   NodeExecutor,
   createNodeExecutor,
+  createNodeRunner,
 } from './node-executor'
 
 // 存储模块
