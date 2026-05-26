@@ -77,7 +77,7 @@ export default function SettingsView() {
             className="text-input"
           />
         </div>
-        <Hint>密钥仅存储在本地浏览器（localStorage），不会上传至任何服务器</Hint>
+        <Hint>🔒 密钥仅保存在浏览器内存中，不会写入本地存储或上传至任何服务器。关闭或刷新页面后需重新输入。</Hint>
       </Section>
 
       <Section icon={Sliders} title="生成参数">

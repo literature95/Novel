@@ -3,7 +3,7 @@
 @import "tailwindcss";
 
 @theme {
-  /* 与 code.html 一致的颜色变量 */
+  /* 雪花叙事架构配色方案 */
   --color-bg-deep: #0b0a09;
   --color-bg-primary: #111010;
   --color-bg-surface: #1a1917;

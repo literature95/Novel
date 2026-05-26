@@ -40,6 +40,7 @@ function PhaseTabs() {
 function NodeWorkflowSection() {
   const { selectedNodeKey, workflowOpen, clearNodeWorkflow } = useNovel()
   if (!workflowOpen || !selectedNodeKey) return null
+  if (['N-1.1', 'N-1.2', 'N-1.3', 'N-1.4', 'N-1.5'].includes(selectedNodeKey)) return null
   return (
     <NodeWorkflowPanel
       nodeKey={selectedNodeKey}
@@ -148,11 +149,11 @@ function Phase1() {
 
   const getPanelByNodeKey = (key) => {
     switch (key) {
-      case 'N-1.1': return <CharacterPanel />
-      case 'N-1.2': return <LocationPanel />
-      case 'N-1.3': return <MagicPanel />
-      case 'N-1.4': return <TimelinePanel />
-      case 'N-1.5': return <ConstraintPanel />
+      case 'N-1.1': return <CharacterPanel nodeKey="N-1.1" />
+      case 'N-1.2': return <LocationPanel nodeKey="N-1.2" />
+      case 'N-1.3': return <MagicPanel nodeKey="N-1.3" />
+      case 'N-1.4': return <TimelinePanel nodeKey="N-1.4" />
+      case 'N-1.5': return <ConstraintPanel nodeKey="N-1.5" />
       default: return null
     }
   }
@@ -183,11 +184,11 @@ function Phase1() {
       
       {!selectedPanel && (
         <>
-          <CharacterPanel />
-          <LocationPanel />
-          <MagicPanel />
-          <TimelinePanel />
-          <ConstraintPanel />
+          <CharacterPanel nodeKey="N-1.1" />
+          <LocationPanel nodeKey="N-1.2" />
+          <MagicPanel nodeKey="N-1.3" />
+          <TimelinePanel nodeKey="N-1.4" />
+          <ConstraintPanel nodeKey="N-1.5" />
           <p className="phase-hint">
             试用：将「林渊」设为 <strong>死亡</strong>，再到「内容创作」点校验，可见 R-001 规则生效。
           </p>

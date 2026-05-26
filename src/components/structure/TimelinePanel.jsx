@@ -1,8 +1,11 @@
+import { useState, useEffect } from 'react'
 import { useNovel } from '../../store'
+import NodeWorkflowPanel from './NodeWorkflowPanel'
+import { canNodeAiGenerate } from '../../lib/node-ai-config'
 
 const SIG_COLORS = { 高: 'var(--color-crimson)', 中: 'var(--color-ochre)', 低: 'var(--color-text-muted)' }
 
-export default function TimelinePanel() {
+export default function TimelinePanel({ nodeKey = 'N-1.4' }) {
   const {
     timeline = [],
     editingTimelineIdx,
@@ -12,7 +15,17 @@ export default function TimelinePanel() {
     deleteTimelineEvent,
     locations = [],
     characters = [],
+    workflowOpen,
+    selectedNodeKey,
   } = useNovel()
+
+  const [showWorkflow, setShowWorkflow] = useState(false)
+
+  useEffect(() => {
+    if (workflowOpen && selectedNodeKey === nodeKey) {
+      setShowWorkflow(true)
+    }
+  }, [workflowOpen, selectedNodeKey, nodeKey])
 
   const t = timeline[editingTimelineIdx]
 
@@ -30,6 +43,13 @@ export default function TimelinePanel() {
         <h3>时间线 · N-1.4 · {timeline.length} 个事件</h3>
         <div className="flex gap-2">
           <button type="button" className="btn btn-ghost btn-sm" onClick={addTimelineEvent}>+ 添加事件</button>
+          {canNodeAiGenerate(nodeKey) && (
+            <button
+              type="button"
+              className={`btn btn-sm ${showWorkflow ? 'btn-primary' : 'btn-ghost'}`}
+              onClick={() => setShowWorkflow(v => !v)}
+            >✦ AI助手</button>
+          )}
         </div>
       </div>
 
@@ -133,6 +153,10 @@ export default function TimelinePanel() {
           </div>
         )}
       </div>
+
+      {showWorkflow && (
+        <NodeWorkflowPanel nodeKey={nodeKey} onClose={() => setShowWorkflow(false)} />
+      )}
     </div>
   )
 }

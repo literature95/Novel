@@ -1,4 +1,7 @@
+import { useState, useEffect } from 'react'
 import { useNovel } from '../../store'
+import NodeWorkflowPanel from './NodeWorkflowPanel'
+import { canNodeAiGenerate } from '../../lib/node-ai-config'
 
 const TYPES = [
   { value: 'absolute', label: 'absolute 硬规则' },
@@ -6,7 +9,7 @@ const TYPES = [
   { value: 'guideline', label: 'guideline 参考' },
 ]
 
-export default function ConstraintPanel() {
+export default function ConstraintPanel({ nodeKey = 'N-1.5' }) {
   const {
     constraints,
     editingRuleIdx,
@@ -14,7 +17,17 @@ export default function ConstraintPanel() {
     addConstraint,
     updateConstraint,
     deleteConstraint,
+    workflowOpen,
+    selectedNodeKey,
   } = useNovel()
+
+  const [showWorkflow, setShowWorkflow] = useState(false)
+
+  useEffect(() => {
+    if (workflowOpen && selectedNodeKey === nodeKey) {
+      setShowWorkflow(true)
+    }
+  }, [workflowOpen, selectedNodeKey, nodeKey])
 
   const r = constraints[editingRuleIdx]
 
@@ -22,7 +35,16 @@ export default function ConstraintPanel() {
     <div className="struct-section edit-panel">
       <div className="struct-section-header">
         <h3>约束规则库 · N-1.5 · {constraints.length} 条</h3>
-        <button type="button" className="btn btn-ghost btn-sm" onClick={addConstraint}>+ 添加规则</button>
+        <div className="flex gap-2">
+          <button type="button" className="btn btn-ghost btn-sm" onClick={addConstraint}>+ 添加规则</button>
+          {canNodeAiGenerate(nodeKey) && (
+            <button
+              type="button"
+              className={`btn btn-sm ${showWorkflow ? 'btn-primary' : 'btn-ghost'}`}
+              onClick={() => setShowWorkflow(v => !v)}
+            >✦ AI助手</button>
+          )}
+        </div>
       </div>
 
       <div className="rule-list">
@@ -96,6 +118,10 @@ export default function ConstraintPanel() {
             </button>
           </div>
         </div>
+      )}
+
+      {showWorkflow && (
+        <NodeWorkflowPanel nodeKey={nodeKey} onClose={() => setShowWorkflow(false)} />
       )}
     </div>
   )

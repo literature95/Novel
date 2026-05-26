@@ -10,6 +10,8 @@ import {
   isValidProject,
   resetSeedCache,
 } from './lib/project'
+import { createEntityReducer } from './lib/reducer-utils'
+import { useEntityCRUD } from './hooks/useEntityCRUD'
 import { computeStaleFromCharacterChange, enrichProject } from './lib/nodes'
 import { validateCurrentScene, validateAllScenes } from './lib/constraints-engine'
 import { calculateHealthScore } from './lib/progress-aggregator'
@@ -50,9 +52,21 @@ function initProjectState() {
   return createDefaultProject()
 }
 
-function finalize(state) {
-  const next = enrichProject(state)
+/** 仅在计数值/阶段结构/陈旧标记变更时才需 enrichProject，其余跳过以消除性能热点 */
+function finalize(state, skipEnrich = false) {
+  const next = skipEnrich ? state : enrichProject(state)
   return isValidProject(next) ? next : state
+}
+
+// ====== 通用实体 Reducer 实例（消除重复的 ADD/UPDATE/DELETE case） ======
+const _cr = {
+  constraints: createEntityReducer('constraints'),
+  locations: createEntityReducer('locations'),
+  magicSystem: createEntityReducer('magicSystem'),
+  timeline: createEntityReducer('timeline'),
+  foreshadows: createEntityReducer('foreshadows'),
+  volumes: createEntityReducer('volumes'),
+  chapters: createEntityReducer('chapters'),
 }
 
 function projectReducer(state, action) {
@@ -64,10 +78,10 @@ function projectReducer(state, action) {
     }
 
     case 'UPDATE_META':
-      return finalize({ ...state, meta: { ...state.meta, ...action.payload } })
+      return finalize({ ...state, meta: { ...state.meta, ...action.payload } }, true)
 
     case 'UPDATE_SETTINGS':
-      return finalize({ ...state, settings: { ...state.settings, ...action.payload } })
+      return finalize({ ...state, settings: { ...state.settings, ...action.payload } }, true)
 
     case 'UPDATE_SCENE_CONTENT': {
       const { chapterId, sceneIndex, content } = action.payload
@@ -77,17 +91,7 @@ function projectReducer(state, action) {
       list[sceneIndex] = { ...list[sceneIndex], content }
       scenes[chapterId] = list
       const chapters = syncChapterStats(state.chapters, scenes)
-      return finalize({ ...state, scenes, chapters })
-    }
-
-    case 'UPDATE_CHAPTER': {
-      const { chapterId, patch } = action.payload
-      return finalize({
-        ...state,
-        chapters: state.chapters.map(ch =>
-          ch.id === chapterId ? { ...ch, ...patch } : ch
-        ),
-      })
+      return finalize({ ...state, scenes, chapters }, true)
     }
 
     case 'ADD_CHARACTER':
@@ -103,11 +107,13 @@ function projectReducer(state, action) {
         i === index ? { ...c, ...patch } : c
       )
       let staleMarkers = state.staleMarkers
+      let skipEnrich = true
       if (markStale && prev) {
         const name = patch.name ?? prev.name
         staleMarkers = computeStaleFromCharacterChange(name, { ...state, characters })
+        skipEnrich = false
       }
-      return finalize({ ...state, characters, staleMarkers })
+      return finalize({ ...state, characters, staleMarkers }, skipEnrich)
     }
 
     case 'DELETE_CHARACTER': {
@@ -119,159 +125,28 @@ function projectReducer(state, action) {
       return finalize({ ...state, characters, staleMarkers })
     }
 
-    case 'ADD_CONSTRAINT':
-      return finalize({
-        ...state,
-        constraints: [...state.constraints, action.payload],
-      })
-
-    case 'UPDATE_CONSTRAINT': {
-      const { index, patch } = action.payload
-      return finalize({
-        ...state,
-        constraints: state.constraints.map((r, i) =>
-          i === index ? { ...r, ...patch } : r
-        ),
-      })
-    }
-
-    case 'DELETE_CONSTRAINT':
-      return finalize({
-        ...state,
-        constraints: state.constraints.filter((_, i) => i !== action.payload),
-      })
-
-    case 'ADD_LOCATION':
-      return finalize({
-        ...state,
-        locations: [...(state.locations || []), action.payload],
-      })
-
-    case 'UPDATE_LOCATION': {
-      const { index, patch } = action.payload
-      return finalize({
-        ...state,
-        locations: (state.locations || []).map((l, i) =>
-          i === index ? { ...l, ...patch } : l
-        ),
-      })
-    }
-
-    case 'DELETE_LOCATION':
-      return finalize({
-        ...state,
-        locations: (state.locations || []).filter((_, i) => i !== action.payload),
-      })
-
-    case 'ADD_MAGIC':
-      return finalize({
-        ...state,
-        magicSystem: [...(state.magicSystem || []), action.payload],
-      })
-
-    case 'UPDATE_MAGIC': {
-      const { index, patch } = action.payload
-      return finalize({
-        ...state,
-        magicSystem: (state.magicSystem || []).map((m, i) =>
-          i === index ? { ...m, ...patch } : m
-        ),
-      })
-    }
-
-    case 'DELETE_MAGIC':
-      return finalize({
-        ...state,
-        magicSystem: (state.magicSystem || []).filter((_, i) => i !== action.payload),
-      })
-
-    case 'ADD_TIMELINE':
-      return finalize({
-        ...state,
-        timeline: [...(state.timeline || []), action.payload],
-      })
-
-    case 'UPDATE_TIMELINE': {
-      const { index, patch } = action.payload
-      return finalize({
-        ...state,
-        timeline: (state.timeline || []).map((t, i) =>
-          i === index ? { ...t, ...patch } : t
-        ),
-      })
-    }
-
-    case 'DELETE_TIMELINE':
-      return finalize({
-        ...state,
-        timeline: (state.timeline || []).filter((_, i) => i !== action.payload),
-      })
-
-    case 'ADD_FORESHADOW':
-      return finalize({
-        ...state,
-        foreshadows: [...state.foreshadows, action.payload],
-      })
-
-    case 'UPDATE_FORESHADOW': {
-      const { index, patch } = action.payload
-      return finalize({
-        ...state,
-        foreshadows: state.foreshadows.map((f, i) =>
-          i === index ? { ...f, ...patch } : f
-        ),
-      })
-    }
-
-    case 'DELETE_FORESHADOW':
-      return finalize({
-        ...state,
-        foreshadows: state.foreshadows.filter((_, i) => i !== action.payload),
-      })
-
-    case 'ADD_VOLUME':
-      return finalize({
-        ...state,
-        volumes: [...state.volumes, action.payload],
-      })
-
-    case 'UPDATE_VOLUME': {
-      const { index, patch } = action.payload
-      return finalize({
-        ...state,
-        volumes: state.volumes.map((v, i) =>
-          i === index ? { ...v, ...patch } : v
-        ),
-      })
-    }
-
-    case 'DELETE_VOLUME':
-      return finalize({
-        ...state,
-        volumes: state.volumes.filter((_, i) => i !== action.payload),
-      })
-
-    case 'ADD_CHAPTER':
-      return finalize({
-        ...state,
-        chapters: [...state.chapters, action.payload],
-      })
-
-    case 'UPDATE_CHAPTER': {
-      const { index, patch } = action.payload
-      return finalize({
-        ...state,
-        chapters: state.chapters.map((c, i) =>
-          i === index ? { ...c, ...patch } : c
-        ),
-      })
-    }
-
-    case 'DELETE_CHAPTER':
-      return finalize({
-        ...state,
-        chapters: state.chapters.filter((_, i) => i !== action.payload),
-      })
+    // ====== 标准实体 CRUD（通过 createEntityReducer 工厂统一处理） ======
+    case 'ADD_CONSTRAINT':     return finalize(_cr.constraints.add(state, action))
+    case 'UPDATE_CONSTRAINT':  return finalize(_cr.constraints.update(state, action), true)
+    case 'DELETE_CONSTRAINT':  return finalize(_cr.constraints.delete(state, action))
+    case 'ADD_LOCATION':       return finalize(_cr.locations.add(state, action), true)
+    case 'UPDATE_LOCATION':    return finalize(_cr.locations.update(state, action), true)
+    case 'DELETE_LOCATION':    return finalize(_cr.locations.delete(state, action), true)
+    case 'ADD_MAGIC':          return finalize(_cr.magicSystem.add(state, action), true)
+    case 'UPDATE_MAGIC':       return finalize(_cr.magicSystem.update(state, action), true)
+    case 'DELETE_MAGIC':       return finalize(_cr.magicSystem.delete(state, action), true)
+    case 'ADD_TIMELINE':       return finalize(_cr.timeline.add(state, action), true)
+    case 'UPDATE_TIMELINE':    return finalize(_cr.timeline.update(state, action), true)
+    case 'DELETE_TIMELINE':    return finalize(_cr.timeline.delete(state, action), true)
+    case 'ADD_FORESHADOW':     return finalize(_cr.foreshadows.add(state, action), true)
+    case 'UPDATE_FORESHADOW':  return finalize(_cr.foreshadows.update(state, action), true)
+    case 'DELETE_FORESHADOW':  return finalize(_cr.foreshadows.delete(state, action), true)
+    case 'ADD_VOLUME':         return finalize(_cr.volumes.add(state, action), true)
+    case 'UPDATE_VOLUME':      return finalize(_cr.volumes.update(state, action), true)
+    case 'DELETE_VOLUME':      return finalize(_cr.volumes.delete(state, action), true)
+    case 'ADD_CHAPTER':        return finalize(_cr.chapters.add(state, action))
+    case 'UPDATE_CHAPTER':     return finalize(_cr.chapters.update(state, action), true)
+    case 'DELETE_CHAPTER':     return finalize(_cr.chapters.delete(state, action))
 
     case 'ADD_SCENE': {
       const { chapterId, scene } = action.payload
@@ -291,7 +166,7 @@ function projectReducer(state, action) {
       list[sceneIndex] = { ...list[sceneIndex], ...patch }
       scenes[chapterId] = list
       const chapters = syncChapterStats(state.chapters, scenes)
-      return finalize({ ...state, scenes, chapters })
+      return finalize({ ...state, scenes, chapters }, true)
     }
 
     case 'DELETE_SCENE': {
@@ -309,7 +184,7 @@ function projectReducer(state, action) {
       return finalize({
         ...state,
         acts: (state.acts || []).map((a, i) => (i === index ? { ...a, ...patch } : a)),
-      })
+      }, true)
     }
 
     case 'UPDATE_PLOT_LINE': {
@@ -317,7 +192,7 @@ function projectReducer(state, action) {
       return finalize({
         ...state,
         plotLines: state.plotLines.map((l, i) => (i === index ? { ...l, ...patch } : l)),
-      })
+      }, true)
     }
 
     case 'UPDATE_COLLABORATION': {
@@ -348,7 +223,7 @@ function projectReducer(state, action) {
           ...collab,
           writers: collab.writers.map((w, i) => (i === index ? { ...w, ...patch } : w)),
         },
-      })
+      }, true)
     }
 
     case 'DELETE_WRITER': {
@@ -378,7 +253,7 @@ function projectReducer(state, action) {
           ...collab,
           chapterAssignments: upsertChapterAssignment(collab.chapterAssignments, chapterId, patch),
         },
-      })
+      }, true)
     }
 
     case 'REMOVE_CHAPTER_ASSIGNMENT': {
@@ -391,7 +266,7 @@ function projectReducer(state, action) {
             a => a.chapterId !== action.payload
           ),
         },
-      })
+      }, true)
     }
 
     case 'ADD_HANDOVER': {
@@ -399,7 +274,7 @@ function projectReducer(state, action) {
       return finalize({
         ...state,
         collaboration: { ...collab, handoverNotes: [...collab.handoverNotes, action.payload] },
-      })
+      }, true)
     }
 
     case 'UPDATE_HANDOVER': {
@@ -413,7 +288,7 @@ function projectReducer(state, action) {
             i === index ? { ...h, ...patch } : h
           ),
         },
-      })
+      }, true)
     }
 
     case 'DELETE_HANDOVER': {
@@ -424,7 +299,7 @@ function projectReducer(state, action) {
           ...collab,
           handoverNotes: collab.handoverNotes.filter((_, i) => i !== action.payload),
         },
-      })
+      }, true)
     }
 
     case 'ADD_SYNC_LOG': {
@@ -444,7 +319,7 @@ function projectReducer(state, action) {
           ...collab,
           syncLog: collab.syncLog.map((s, i) => (i === index ? { ...s, ...patch } : s)),
         },
-      })
+      }, true)
     }
 
     case 'DELETE_SYNC_LOG': {
@@ -459,7 +334,7 @@ function projectReducer(state, action) {
     }
 
     case 'CLEAR_STALE':
-      return finalize({ ...state, staleMarkers: {} })
+      return finalize({ ...state, staleMarkers: {} }, true)
 
     case 'SET_NODE_STATUS': {
       const { nodeKey, status } = action.payload
@@ -515,7 +390,7 @@ function projectReducer(state, action) {
 
     case 'VALIDATE_PROJECT': {
       const result = validateProject(state)
-      return finalize({ ...state, validationResult: result })
+      return finalize({ ...state, validationResult: result }, true)
     }
 
     case 'APPLY_NODE_GENERATION': {
@@ -589,13 +464,6 @@ export function NovelProvider({ children }) {
   const [generating, setGenerating] = useState(false)
   const [saveStatus, setSaveStatus] = useState('saved')
   const [editingCharIdx, setEditingCharIdx] = useState(0)
-  const [editingRuleIdx, setEditingRuleIdx] = useState(0)
-  const [editingLocIdx, setEditingLocIdx] = useState(0)
-  const [editingMagicIdx, setEditingMagicIdx] = useState(0)
-  const [editingTimelineIdx, setEditingTimelineIdx] = useState(0)
-  const [editingFsIdx, setEditingFsIdx] = useState(0)
-  const [editingVolumeIdx, setEditingVolumeIdx] = useState(0)
-  const [editingChapterIdx, setEditingChapterIdx] = useState(0)
   const [selectedNodeKey, setSelectedNodeKey] = useState(null)
   const [nodeWorkflow, setNodeWorkflow] = useState(null)
   const [workflowOpen, setWorkflowOpen] = useState(false)
@@ -695,160 +563,71 @@ export function NovelProvider({ children }) {
     setEditingCharIdx(i => Math.max(0, i >= index ? i - 1 : i))
   }, [])
 
-  const addConstraint = useCallback(() => {
-    const id = nextConstraintId(project.constraints)
-    const rule = { id, type: 'soft', name: '新规则', desc: '' }
-    dispatch({ type: 'ADD_CONSTRAINT', payload: rule })
-    setEditingRuleIdx(project.constraints.length)
-  }, [project.constraints])
+  // ====== 通用实体 CRUD（useEntityCRUD 替代 7 组重复的 add/update/delete + editingIdx） ======
+  const { add: addConstraint, update: updateConstraint, remove: deleteConstraint,
+          editingIdx: editingRuleIdx, setEditingIdx: setEditingRuleIdx } = useEntityCRUD({
+    dispatch, addType: 'ADD_CONSTRAINT', updateType: 'UPDATE_CONSTRAINT', deleteType: 'DELETE_CONSTRAINT',
+    createDefault: (items) => ({ id: nextConstraintId(items), type: 'soft', name: '新规则', desc: '' }),
+    getItems: () => project.constraints,
+    confirmLabel: '该规则',
+  })
 
-  const updateConstraint = useCallback((index, patch) => {
-    dispatch({ type: 'UPDATE_CONSTRAINT', payload: { index, patch } })
-  }, [])
+  const { add: addLocation, update: updateLocation, remove: deleteLocation,
+          editingIdx: editingLocIdx, setEditingIdx: setEditingLocIdx } = useEntityCRUD({
+    dispatch, addType: 'ADD_LOCATION', updateType: 'UPDATE_LOCATION', deleteType: 'DELETE_LOCATION',
+    createDefault: (items) => ({ id: `L${String((items || []).length + 1).padStart(2, '0')}`, name: '新地点', type: 'building', era: '', features: '', connectedTo: [], mood: '' }),
+    getItems: () => project.locations || [],
+    confirmLabel: '该地点',
+  })
 
-  const deleteConstraint = useCallback((index) => {
-    if (!confirm('确定删除该规则？')) return
-    dispatch({ type: 'DELETE_CONSTRAINT', payload: index })
-    setEditingRuleIdx(i => Math.max(0, i >= index ? i - 1 : i))
-  }, [])
+  const { add: addMagic, update: updateMagic, remove: deleteMagic,
+          editingIdx: editingMagicIdx, setEditingIdx: setEditingMagicIdx } = useEntityCRUD({
+    dispatch, addType: 'ADD_MAGIC', updateType: 'UPDATE_MAGIC', deleteType: 'DELETE_MAGIC',
+    createDefault: (items) => ({ id: `M${String((items || []).length + 1).padStart(2, '0')}`, name: '新设定', type: 'ability', source: '', rules: '', cost: '', usage: '', note: '' }),
+    getItems: () => project.magicSystem || [],
+    confirmLabel: '该设定',
+  })
 
-  // --- Locations ---
-  const addLocation = useCallback(() => {
-    const id = `L${String((project.locations || []).length + 1).padStart(2, '0')}`
-    const loc = { id, name: '新地点', type: 'building', era: '', features: '', connectedTo: [], mood: '' }
-    dispatch({ type: 'ADD_LOCATION', payload: loc })
-    setEditingLocIdx((project.locations || []).length)
-  }, [project.locations])
+  const { add: addTimelineEvent, update: updateTimelineEvent, remove: deleteTimelineEvent,
+          editingIdx: editingTimelineIdx, setEditingIdx: setEditingTimelineIdx } = useEntityCRUD({
+    dispatch, addType: 'ADD_TIMELINE', updateType: 'UPDATE_TIMELINE', deleteType: 'DELETE_TIMELINE',
+    createDefault: (items) => ({ id: `T${String((items || []).length + 1).padStart(2, '0')}`, year: '', event: '新事件', era: '', characters: [], locations: [], significance: '中' }),
+    getItems: () => project.timeline || [],
+    confirmLabel: '该事件',
+  })
 
-  const updateLocation = useCallback((index, patch) => {
-    dispatch({ type: 'UPDATE_LOCATION', payload: { index, patch } })
-  }, [])
+  const { add: addForeshadow, update: updateForeshadow, remove: deleteForeshadow,
+          editingIdx: editingFsIdx, setEditingIdx: setEditingFsIdx } = useEntityCRUD({
+    dispatch, addType: 'ADD_FORESHADOW', updateType: 'UPDATE_FORESHADOW', deleteType: 'DELETE_FORESHADOW',
+    createDefault: (items) => {
+      const max = (items || []).reduce((m, f) => { const n = parseInt(f.id.replace('F', '')); return isNaN(n) ? m : Math.max(m, n) }, 0)
+      return { id: `F${String(max + 1).padStart(2, '0')}`, title: '新伏笔', importance: 0.5, status: 'drafted', planted: '-', deadline: 'Ch30', desc: '' }
+    },
+    getItems: () => project.foreshadows,
+    confirmLabel: '该伏笔',
+  })
 
-  const deleteLocation = useCallback((index) => {
-    if (!confirm('确定删除该地点？')) return
-    dispatch({ type: 'DELETE_LOCATION', payload: index })
-    setEditingLocIdx(i => Math.max(0, i >= index ? i - 1 : i))
-  }, [])
+  const { add: addVolume, update: updateVolume, remove: deleteVolume,
+          editingIdx: editingVolumeIdx, setEditingIdx: setEditingVolumeIdx } = useEntityCRUD({
+    dispatch, addType: 'ADD_VOLUME', updateType: 'UPDATE_VOLUME', deleteType: 'DELETE_VOLUME',
+    createDefault: (items) => {
+      const max = (items || []).reduce((m, v) => { const n = parseInt(v.id.replace('v', '')); return isNaN(n) ? m : Math.max(m, n) }, 0)
+      return { id: `v${max + 1}`, name: '新分册', range: 'Ch1–Ch10', chapters: [], hook: '', midpoint: '', climax: '', desc: '' }
+    },
+    getItems: () => project.volumes || [],
+    confirmLabel: '该分册',
+  })
 
-  // --- Magic System ---
-  const addMagic = useCallback(() => {
-    const id = `M${String((project.magicSystem || []).length + 1).padStart(2, '0')}`
-    const m = { id, name: '新设定', type: 'ability', source: '', rules: '', cost: '', usage: '', note: '' }
-    dispatch({ type: 'ADD_MAGIC', payload: m })
-    setEditingMagicIdx((project.magicSystem || []).length)
-  }, [project.magicSystem])
-
-  const updateMagic = useCallback((index, patch) => {
-    dispatch({ type: 'UPDATE_MAGIC', payload: { index, patch } })
-  }, [])
-
-  const deleteMagic = useCallback((index) => {
-    if (!confirm('确定删除该设定？')) return
-    dispatch({ type: 'DELETE_MAGIC', payload: index })
-    setEditingMagicIdx(i => Math.max(0, i >= index ? i - 1 : i))
-  }, [])
-
-  // --- Timeline ---
-  const addTimelineEvent = useCallback(() => {
-    const id = `T${String((project.timeline || []).length + 1).padStart(2, '0')}`
-    const t = { id, year: '', event: '新事件', era: '', characters: [], locations: [], significance: '中' }
-    dispatch({ type: 'ADD_TIMELINE', payload: t })
-    setEditingTimelineIdx((project.timeline || []).length)
-  }, [project.timeline])
-
-  const updateTimelineEvent = useCallback((index, patch) => {
-    dispatch({ type: 'UPDATE_TIMELINE', payload: { index, patch } })
-  }, [])
-
-  const deleteTimelineEvent = useCallback((index) => {
-    if (!confirm('确定删除该事件？')) return
-    dispatch({ type: 'DELETE_TIMELINE', payload: index })
-    setEditingTimelineIdx(i => Math.max(0, i >= index ? i - 1 : i))
-  }, [])
-
-  const nextForeshadowId = useCallback(() => {
-    const max = foreshadows.reduce((m, f) => {
-      const n = parseInt(f.id.replace('F', ''))
-      return isNaN(n) ? m : Math.max(m, n)
-    }, 0)
-    return `F${String(max + 1).padStart(2, '0')}`
-  }, [foreshadows])
-
-  const addForeshadow = useCallback(() => {
-    const id = nextForeshadowId()
-    const fs = { id, title: '新伏笔', importance: 0.5, status: 'drafted', planted: '-', deadline: 'Ch30', desc: '' }
-    dispatch({ type: 'ADD_FORESHADOW', payload: fs })
-    setEditingFsIdx(foreshadows.length)
-  }, [foreshadows, nextForeshadowId])
-
-  const updateForeshadow = useCallback((index, patch) => {
-    dispatch({ type: 'UPDATE_FORESHADOW', payload: { index, patch } })
-  }, [])
-
-  const deleteForeshadow = useCallback((index) => {
-    if (!confirm('确定删除该伏笔？')) return
-    dispatch({ type: 'DELETE_FORESHADOW', payload: index })
-    setEditingFsIdx(i => Math.max(0, i >= index ? i - 1 : i))
-  }, [])
-
-  const nextVolumeId = useCallback(() => {
-    const max = (volumes || []).reduce((m, v) => {
-      const n = parseInt(v.id.replace('v', ''))
-      return isNaN(n) ? m : Math.max(m, n)
-    }, 0)
-    return `v${max + 1}`
-  }, [volumes])
-
-  const addVolume = useCallback(() => {
-    const id = nextVolumeId()
-    const vol = { id, name: '新分册', range: 'Ch1–Ch10', chapters: [], hook: '', midpoint: '', climax: '', desc: '' }
-    dispatch({ type: 'ADD_VOLUME', payload: vol })
-    setEditingVolumeIdx((volumes || []).length)
-  }, [volumes, nextVolumeId])
-
-  const updateVolume = useCallback((index, patch) => {
-    dispatch({ type: 'UPDATE_VOLUME', payload: { index, patch } })
-  }, [])
-
-  const deleteVolume = useCallback((index) => {
-    if (!confirm('确定删除该分册？')) return
-    dispatch({ type: 'DELETE_VOLUME', payload: index })
-    setEditingVolumeIdx(i => Math.max(0, i >= index ? i - 1 : i))
-  }, [])
-
-  const nextChapterId = useCallback(() => {
-    const max = chapters.reduce((m, c) => Math.max(m, c.id), 0)
-    return max + 1
-  }, [chapters])
-
-  const addChapter = useCallback(() => {
-    const id = nextChapterId()
-    const ch = {
-      id,
-      title: `第${id}章`,
-      status: 'locked',
-      words: 0,
-      targetWords: 3000,
-      scenes: 0,
-      characters: [],
-      locations: [],
-      plotLines: [],
-      momentum: 0.5,
-      emotionPeak: 0.5,
-    }
-    dispatch({ type: 'ADD_CHAPTER', payload: ch })
-    setEditingChapterIdx(chapters.length)
-  }, [chapters, nextChapterId])
-
-  const updateChapter = useCallback((index, patch) => {
-    dispatch({ type: 'UPDATE_CHAPTER', payload: { index, patch } })
-  }, [])
-
-  const deleteChapter = useCallback((index) => {
-    if (!confirm('确定删除该章节？')) return
-    dispatch({ type: 'DELETE_CHAPTER', payload: index })
-    setEditingChapterIdx(i => Math.max(0, i >= index ? i - 1 : i))
-  }, [])
+  const { add: addChapter, update: updateChapter, remove: deleteChapter,
+          editingIdx: editingChapterIdx, setEditingIdx: setEditingChapterIdx } = useEntityCRUD({
+    dispatch, addType: 'ADD_CHAPTER', updateType: 'UPDATE_CHAPTER', deleteType: 'DELETE_CHAPTER',
+    createDefault: (items) => {
+      const max = (items || []).reduce((m, c) => Math.max(m, c.id), 0) + 1
+      return { id: max, title: `第${max}章`, status: 'locked', words: 0, targetWords: 3000, scenes: 0, characters: [], locations: [], plotLines: [], momentum: 0.5, emotionPeak: 0.5 }
+    },
+    getItems: () => project.chapters,
+    confirmLabel: '该章节',
+  })
 
   const addScene = useCallback((chapterId) => {
     const sceneNum = (scenes[chapterId] || []).length + 1

@@ -1,8 +1,11 @@
+import { useState, useEffect } from 'react'
 import { useNovel } from '../../store'
+import NodeWorkflowPanel from './NodeWorkflowPanel'
+import { canNodeAiGenerate } from '../../lib/node-ai-config'
 
 const TYPE_LABELS = { ability: '能力', rule: '规则', cost: '代价', artifact: '器物', other: '其他' }
 
-export default function MagicPanel() {
+export default function MagicPanel({ nodeKey = 'N-1.3' }) {
   const {
     magicSystem = [],
     editingMagicIdx,
@@ -10,7 +13,17 @@ export default function MagicPanel() {
     addMagic,
     updateMagic,
     deleteMagic,
+    workflowOpen,
+    selectedNodeKey,
   } = useNovel()
+
+  const [showWorkflow, setShowWorkflow] = useState(false)
+
+  useEffect(() => {
+    if (workflowOpen && selectedNodeKey === nodeKey) {
+      setShowWorkflow(true)
+    }
+  }, [workflowOpen, selectedNodeKey, nodeKey])
 
   const m = magicSystem[editingMagicIdx]
 
@@ -20,6 +33,13 @@ export default function MagicPanel() {
         <h3>力量体系 · N-1.3 · {magicSystem.length} 条设定</h3>
         <div className="flex gap-2">
           <button type="button" className="btn btn-ghost btn-sm" onClick={addMagic}>+ 添加设定</button>
+          {canNodeAiGenerate(nodeKey) && (
+            <button
+              type="button"
+              className={`btn btn-sm ${showWorkflow ? 'btn-primary' : 'btn-ghost'}`}
+              onClick={() => setShowWorkflow(v => !v)}
+            >✦ AI助手</button>
+          )}
         </div>
       </div>
 
@@ -79,6 +99,10 @@ export default function MagicPanel() {
           </div>
         )}
       </div>
+
+      {showWorkflow && (
+        <NodeWorkflowPanel nodeKey={nodeKey} onClose={() => setShowWorkflow(false)} />
+      )}
     </div>
   )
 }

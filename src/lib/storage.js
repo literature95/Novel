@@ -30,16 +30,24 @@ export function loadProject() {
   }
 }
 
+function stripApiKey(project) {
+  return {
+    ...project,
+    settings: project.settings ? { ...project.settings, apiKey: '' } : project.settings,
+  }
+}
+
 export function saveProject(project) {
   if (!isValidProject(project)) {
     console.error('[Novel] 拒绝保存无效项目数据', project)
     return false
   }
   try {
+    const safe = stripApiKey(project)
     const payload = {
-      ...project,
+      ...safe,
       meta: {
-        ...project.meta,
+        ...safe.meta,
         updatedAt: new Date().toISOString(),
       },
     }
@@ -57,7 +65,8 @@ export function clearStoredProject() {
 
 export function downloadProjectJson(project, filename) {
   const name = filename || `${project.meta?.title || 'snowflake'}_export.json`
-  const blob = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' })
+  const safe = stripApiKey(project)
+  const blob = new Blob([JSON.stringify(safe, null, 2)], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url

@@ -1,9 +1,12 @@
+import { useState, useEffect } from 'react'
 import { useNovel } from '../../store'
+import NodeWorkflowPanel from './NodeWorkflowPanel'
+import { canNodeAiGenerate } from '../../lib/node-ai-config'
 
 const COLORS = ['cerulean', 'rose', 'crimson', 'olive', 'ochre', 'amber']
 const ROLES = ['男主', '女主', '反派', '配角']
 
-export default function CharacterPanel() {
+export default function CharacterPanel({ nodeKey = 'N-1.1' }) {
   const {
     characters,
     editingCharIdx,
@@ -11,7 +14,17 @@ export default function CharacterPanel() {
     addCharacter,
     updateCharacter,
     deleteCharacter,
+    workflowOpen,
+    selectedNodeKey,
   } = useNovel()
+
+  const [showWorkflow, setShowWorkflow] = useState(false)
+
+  useEffect(() => {
+    if (workflowOpen && selectedNodeKey === nodeKey) {
+      setShowWorkflow(true)
+    }
+  }, [workflowOpen, selectedNodeKey, nodeKey])
 
   const c = characters[editingCharIdx]
 
@@ -21,6 +34,13 @@ export default function CharacterPanel() {
         <h3>角色库 · N-1.1 · {characters.length} 位</h3>
         <div className="flex gap-2">
           <button type="button" className="btn btn-ghost btn-sm" onClick={addCharacter}>+ 添加角色</button>
+          {canNodeAiGenerate(nodeKey) && (
+            <button
+              type="button"
+              className={`btn btn-sm ${showWorkflow ? 'btn-primary' : 'btn-ghost'}`}
+              onClick={() => setShowWorkflow(v => !v)}
+            >✦ AI助手</button>
+          )}
         </div>
       </div>
 
@@ -128,6 +148,10 @@ export default function CharacterPanel() {
             <span className="form-hint">修改后将触发下游节点回溯标记（黄/红）</span>
           </div>
         </div>
+      )}
+
+      {showWorkflow && (
+        <NodeWorkflowPanel nodeKey={nodeKey} onClose={() => setShowWorkflow(false)} />
       )}
     </div>
   )

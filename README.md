@@ -200,11 +200,12 @@ Novel/
     │   │
     │   ├── structure/
     │   │   ├── StructureView.jsx      # 七阶段 Tab + NodeCard + StaleBanner
-    │   │   ├── CharacterPanel.jsx     # N-1.1 角色库
-    │   │   ├── LocationPanel.jsx      # N-1.2 地点库
-    │   │   ├── MagicPanel.jsx         # N-1.3 力量体系
-    │   │   ├── TimelinePanel.jsx      # N-1.4 时间线
-    │   │   ├── ConstraintPanel.jsx    # N-1.5 约束规则
+    │   │   ├── CharacterPanel.jsx     # N-1.1 角色库（内嵌 AI 工作流）
+    │   │   ├── LocationPanel.jsx      # N-1.2 地点库（内嵌 AI 工作流）
+    │   │   ├── MagicPanel.jsx         # N-1.3 力量体系（内嵌 AI 工作流）
+    │   │   ├── TimelinePanel.jsx      # N-1.4 时间线（内嵌 AI 工作流）
+    │   │   ├── ConstraintPanel.jsx    # N-1.5 约束规则（内嵌 AI 工作流）
+    │   │   ├── NodeWorkflowPanel.jsx  # 六步 AI 完善流程（嵌入各 Panel）
     │   │   ├── ActPlotPanel.jsx       # N-2.1 / N-2.2 三幕与五线
     │   │   ├── ForeshadowPanel.jsx    # N-2.3 伏笔网
     │   │   ├── CollaborationPanel.jsx # N-3.1 作者 / 章节归属 / 交接
@@ -306,7 +307,7 @@ model Scene {
 | 节点 | 功能 | 原型 | 说明 |
 |------|------|------|------|
 | N-0 | 项目首页 | ✅ | `HomeView`：进度、导入导出、节点总览 |
-| N-1.1～N-1.5 | 世界观五库 | ✅ | 各 Panel CRUD + 回溯标记 |
+| N-1.1～N-1.5 | 世界观五库 | ✅ | 各 Panel 内嵌 AI 工作流 + CRUD + 回溯标记 |
 | N-2.1～N-2.2 | 三幕 / 五线 | ✅ | `ActPlotPanel` 可编辑 |
 | N-2.3 | 伏笔网 | ✅ | `ForeshadowPanel` |
 | N-3.1 | 协同面板 | ✅ | `CollaborationPanel` 作者/章节归属/交接 CRUD |

@@ -1,11 +1,14 @@
+import { useState, useEffect } from 'react'
 import { useNovel } from '../../store'
+import NodeWorkflowPanel from './NodeWorkflowPanel'
+import { canNodeAiGenerate } from '../../lib/node-ai-config'
 
 const TYPE_LABELS = {
   town: '城镇', wild: '野外', building: '建筑',
   underground: '地下', route: '路径', other: '其他',
 }
 
-export default function LocationPanel() {
+export default function LocationPanel({ nodeKey = 'N-1.2' }) {
   const {
     locations = [],
     editingLocIdx,
@@ -13,7 +16,17 @@ export default function LocationPanel() {
     addLocation,
     updateLocation,
     deleteLocation,
+    workflowOpen,
+    selectedNodeKey,
   } = useNovel()
+
+  const [showWorkflow, setShowWorkflow] = useState(false)
+
+  useEffect(() => {
+    if (workflowOpen && selectedNodeKey === nodeKey) {
+      setShowWorkflow(true)
+    }
+  }, [workflowOpen, selectedNodeKey, nodeKey])
 
   const loc = locations[editingLocIdx]
 
@@ -23,6 +36,13 @@ export default function LocationPanel() {
         <h3>地点库 · N-1.2 · {locations.length} 个地点</h3>
         <div className="flex gap-2">
           <button type="button" className="btn btn-ghost btn-sm" onClick={addLocation}>+ 添加地点</button>
+          {canNodeAiGenerate(nodeKey) && (
+            <button
+              type="button"
+              className={`btn btn-sm ${showWorkflow ? 'btn-primary' : 'btn-ghost'}`}
+              onClick={() => setShowWorkflow(v => !v)}
+            >✦ AI助手</button>
+          )}
         </div>
       </div>
 
@@ -78,6 +98,10 @@ export default function LocationPanel() {
           </div>
         )}
       </div>
+
+      {showWorkflow && (
+        <NodeWorkflowPanel nodeKey={nodeKey} onClose={() => setShowWorkflow(false)} />
+      )}
     </div>
   )
 }
